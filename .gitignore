@@ -1,0 +1,13 @@
+environment
+env
+*.log
+*.jsonl
+*.json
+*.xlsx
+*.txt
+*.jsonlines
+!requirements.txt
+!brands.xlsx
+!generalTable.xlsx
+__pycache__
+.DS_Store

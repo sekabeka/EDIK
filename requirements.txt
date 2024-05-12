@@ -1,0 +1,12 @@
+asyncio
+scrapy
+pandas
+openpyxl
+aiogram
+requests
+bs4
+lxml
+xlsxwriter
+schedule
+playwright
+fake-useragent

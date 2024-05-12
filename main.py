@@ -1,0 +1,31 @@
+from auchan.result import run as auchan
+from child.result import run as child
+
+from multiprocessing import Process
+
+import schedule
+import time
+
+def job():
+    p1 = Process(target=auchan)
+    p2 = Process(target=child)
+    
+    p1.start()
+    p2.start()
+
+    p1.join()
+    p2.join()
+
+#schedule.every().days.at("04:00", "Europe/Moscow").do(job)
+if __name__=='__main__':
+    # job()
+    child()
+    #while True:
+        #schedule.run_pending()
+        #time.sleep(1)
+    
+
+
+
+
+        
