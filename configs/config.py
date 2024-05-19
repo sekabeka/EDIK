@@ -1,3 +1,0 @@
-API_KEY = "005cce153b-c1ce75395d-c33d9da48f"
-
-BOT_TOKEN = '6003323325:AAFqkuiE8wjzA-WElnlEPdSsXjpVEA0AbGc'

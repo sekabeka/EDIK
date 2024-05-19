@@ -1,5 +1,5 @@
-environment
-env
+.venv
+.env
 *.log
 *.jsonl
 *.json

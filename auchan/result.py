@@ -9,11 +9,12 @@ from fake_useragent import UserAgent
 import pandas as pd
 
 
+
 def df(lst, key):
     result = {i : [] for i in set([i[key] for i in lst])}
     for item in lst:
         num = item[key]
-        #del item[key]
+        del item[key]
         result[num].append(item)
     for k, v in result.items():
         yield k, v
@@ -21,7 +22,7 @@ def df(lst, key):
 
 
 
-def filter(object:pd.DataFrame, key:str):
+def _filter(object:pd.DataFrame, key:str):
     return object.drop_duplicates(subset=[key])
 
 class AUCHAN(scrapy.Spider):
@@ -49,46 +50,39 @@ class AUCHAN(scrapy.Spider):
         placement = p['Размещение на сайте']
         urls = p['Ссылки на категории товаров']
         prefixs = p['Префиксы']
+        roots = p['Корневая']
         cats1 = p['Подкатегория 1']
         cats2 = p['Подкатегория 2']
-        #cats3 = p['Подкатегория 3']
         fms = p["Формула цены продажи"]
         mrgs = p['Маржа']
         deliveries = p['Параметр: Доставка']
+        exceptions = [i.casefold().strip() for i in list(filter(lambda x: type(x) == str, p['Исключения']))]
         idx = 1
         for (
-            place, url, pref, cat1, cat2, fm, mg, delivery
+            place, url, pref, cat1, cat2, fm, mg, delivery, root
         ) in zip(
-            placement, urls, prefixs, cats1, cats2, fms, mrgs, deliveries
+            placement, urls, prefixs, cats1, cats2, fms, mrgs, deliveries, roots
         ):
             yield scrapy.Request(
                 url=url,
                 cb_kwargs={
-                    'Подкаталог 1' : cat1,
-                    'Подкаталог 2' : cat2,
-                    #'Подкаталог 3' : cat3 if cat3 else None,
-                    'prefix' : pref,
+                    'Корневая': root,
+                    'Подкатегория 1' : cat1,
+                    'Подкатегория 2' : cat2,
+                    'Префикс' : pref,
                     'Размещение на сайте' : place,
                     'Формула' : fm.split('=')[-1],
                     'Маржа' : mg,
                     'Параметр: Доставка' : delivery,
                     'Ссылка на категорию товаров' : url,
-                    'number' : idx
-
+                    'Номер' : idx,
+                    'Исключения' : exceptions
                 },
-                callback=self.catalogs
+                callback=self.catalogs,
+                dont_filter=True
             )
             idx = idx + 1
-    def handler(self, response, **kwargs):
-        soup = BeautifulSoup(response.text, 'lxml')
-        products = soup.find_all('div', class_=re.compile(r'Layout'))[1].find_all('article', class_=re.compile(r'productCard active'))
-        for url in ['https://www.auchan.ru' + item.find('a', class_='productCardPictureLink')['href'] for item in products]:
-            yield scrapy.Request(
-                url=url,
-                cb_kwargs=kwargs
-            )
-
-        
+    
 
     def catalogs(self, response, **kwargs):
         soup = BeautifulSoup(response.text, 'lxml')
@@ -112,8 +106,11 @@ class AUCHAN(scrapy.Spider):
     def parse(self, response, **kwargs):
         soup = BeautifulSoup(response.text, 'lxml')
         brand = soup.find('a', class_='css-1awj3d7')
+        exceptions = kwargs.pop('Исключения')
         if brand != None:
             brand = brand.text.strip()
+            if brand.casefold() in exceptions:
+                return 
         else:
             brand = "Не указан"
         price = soup.find('div', class_='fullPricePDP')
@@ -173,11 +170,30 @@ class AUCHAN(scrapy.Spider):
             else:
                 pass
         name = soup.find('h1', id='productName').text.strip()
-        lis = soup.find_all('li', attrs={"itemprop": "itemListElement"})
-        tmp = []
-        #for li in lis[1:-1]:
-            #tmp.append(li.span.text.strip())
-        prefix = kwargs.pop('prefix')
+        
+        tmp = {}
+        for item in soup.find('table', class_='css-9qtgi1').find_all('tr'):
+            prop = item.find('th').text.strip()
+            key = item.find('td').text.strip()
+            tmp[prop] = key
+        properties = {}
+        names = [
+            'Страна производства',
+            "Тип товара",
+            "Область применения",
+            "Пол",
+            "Эффект от использования",
+            "Назначение",
+            'Тип крупы',  
+        ]
+        for name in names:
+            for key in tmp.keys():
+                if name == key:
+                    properties[f'Параметр: {name}'] = tmp[key]
+                    break
+                else:
+                    continue
+        prefix = kwargs.pop('Префикс')
         formulae = kwargs.pop('Формула')
         margin = kwargs.pop('Маржа')
         pattern = re.compile(r"Масса брутто, кг")
@@ -186,51 +202,38 @@ class AUCHAN(scrapy.Spider):
         else:
             mass = 'Нет массы'
         result = {
+            'Параметр: Поставщик' : 'SMDB',
+            "Параметр: Доставка" :  kwargs.pop('Параметр: Доставка'),
+            "Свойство: Вариант" : None,
             'Вес, кг' : mass,
-            **kwargs,
+            'Корневая' : kwargs.pop('Корневая'),
+            'Подкатегория 1' : kwargs.pop('Подкатегория 1'),
+            "Подкатегория 2" : kwargs.pop('Подкатегория 2'),
             'Название товара или услуги' : name,
-            #"Размещение на сайте" : 'Каталог/' + catalog_one + '/' + '/'.join(tmp),
             'Полное описание' : definition,
             'Краткое описание' : None,
+            'Параметр: Бренд' : brand,
+            "Размещение на сайте" : kwargs.pop('Размещение на сайте'),
             'Артикул' : str(prefix) + article,
+            'Артикул поставщика' : article,
             'Цена продажи' : "{:.2f}".format(eval(formulae.replace('ЦЗ', str(price)).replace('ВЕС', str(mass)).replace('р','').replace('МАРЖА', str(margin)))).replace('.', ',') if type(mass) == float else None,
             'Старая цена' : old_price,
             'Цена закупки' : re.sub('[.]',',',price),
             'Остаток' : count,
-            'Параметр: Бренд' : brand,
-            'Параметр: Артикул поставщика' : article,
-            'Параметр: Производитель' : brand,
+            "Маржа" : margin,
             'Параметр: Размер скидки' : sale,
+            "Параметр: Метки" : None,
+            'Параметр: Производитель' : brand,
+            'Параметр: Страна-производитель' : properties.pop('Параметр: Страна производства') if 'Параметр: Страна производства' in properties.keys() else None,
+            'Ссылка на товар' : response.url,
+            'Ссылка на категорию товаров' : kwargs.pop("Ссылка на категорию товаров"),
+            'Изображения' : ' '.join(images),
+            'Параметр: Артикул поставщика' : article,
             'Параметр: Период скидки' : period_sale,
-            'Параметр: Поставщик' : 'SMDB',
             'Параметр: Group' : str(prefix)[:-1].upper(),
+            **properties, **kwargs
         }
-        tmp = {}
-        for item in soup.find('table', class_='css-9qtgi1').find_all('tr'):
-            prop = item.find('th').text.strip()
-            key = item.find('td').text.strip()
-            tmp[prop] = key
-
-        names = [
-            'Страна производства',
-            "Тип товара",
-            "Область применения",
-            "Пол",
-            "Эффект от использования",
-            "Назначение",
-            'Тип крупы',
-            
-        ]
-        for name in names:
-            result[f'Параметр: {name}'] = None
-            for key in tmp.keys():
-                if name == key:
-                    result[f'Параметр: {name}'] = tmp[key]
-                    break
-                else:
-                    continue
-        result['Изображения'] = ' '.join(images)
-        result['Ссылка на товар'] = response.url
+        
         yield result
 
     def closed(self, reason):
@@ -259,7 +262,7 @@ class AUCHAN(scrapy.Spider):
             ]
             key = 'Параметр: Артикул поставщика'
             p = pd.DataFrame(result)
-            p = filter(p,key)
+            p = _filter(p,key)
             tmp = p.to_dict('list')
             for key in list(tmp.keys()):
                 if key in keys:
@@ -268,9 +271,14 @@ class AUCHAN(scrapy.Spider):
                     tmp.pop(key)
             p.to_excel(writer, index=False, sheet_name='result')
             pd.DataFrame(tmp).to_excel(writer, index=False, sheet_name='result_1')
-            for name, res in df(result, 'number'):
-                p = pd.DataFrame(res)
+            table = pd.read_excel('generalTable.xlsx', sheet_name='SMDB').to_dict('list')
+            for name, products in df(result, "Номер"):
+                p = pd.DataFrame(products)
+                table['Кол-во товаров'][name - 1] = len(products)
+                table['Номер книги в файле'][name - 1] = name
                 p.to_excel(writer, sheet_name=str(name), index=False)
+            with pd.ExcelWriter('generalTable.xlsx', mode='a', if_sheet_exists='replace', engine='openpyxl') as w:
+                pd.DataFrame(table).to_excel(w, sheet_name='SMDB', index=False)
             
             
             

@@ -1,9 +1,16 @@
 import asyncio
 import requests
 import logging
+import os
+import time, random
 
+
+from dotenv import load_dotenv
 from playwright.async_api import async_playwright, BrowserContext
-from configs.config import API_KEY
+
+load_dotenv()
+
+API_KEY = os.getenv('API_KEY')
 
 class CookiesAuchan:
     def __init__(self):
@@ -77,14 +84,8 @@ class TEST:
         return asyncio.run(self.main())
 
     def proxys(self):
-        import time
-        while True:
-            response = requests.get(f"https://proxy6.net/api/{API_KEY}/getproxy")
-            if response.ok:
-                break
-            else:
-                time.sleep(5)
-                
+        time.sleep(random.randint(4, 6))
+        response = requests.get(f"https://proxy6.net/api/{API_KEY}/getproxy")   
         data = response.json()
         result = []
         for item in data['list'].values():

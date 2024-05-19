@@ -53,26 +53,27 @@ class CHILD(scrapy.Spider):
         fms = p["Формула цены продажи"]
         mrgs = p['Маржа']
         deliveries = p['Параметр: Доставка']
+        exceptions = [i.casefold().strip() for i in list(filter(lambda x: type(x) == str, p['Исключения']))]
         value = 1
         for url, root, add, add2, pref, place, fm, mg, delivery in zip(start_urls, roots_categories, add_categories, add2_categories, prefixs, placements, fms, mrgs, deliveries):
             kwargs = {
-                'root_category' : root,
-                'add_category' : add,
-                'add2_category' : add2 if add2 else None,
-                'prefix' : pref,
-                'placement' : place,
-                #'page' : 1,
-                #'domain' : url,
-                'number' : value,
+                'Корневая' : root,
+                'Подкатегория 1' : add,
+                'Подкатегория 2' : add2 if add2 else None,
+                'Префикс' : pref,
+                'Расположение на сайте' : place,
+                'Номер' : value,
                 "init" : None,
                 'Формула' : fm.split('=')[-1],
                 'Маржа' : mg,
                 'Доставка' : delivery,
-                'Ссылка на категорию товаров' : url
+                'Ссылка на категорию товаров' : url,
+                'Исключения' : exceptions
             }
             yield scrapy.Request(
                 url,
                 cb_kwargs=kwargs,
+                dont_filter=True
             )
             value = value + 1
 
@@ -82,20 +83,25 @@ class CHILD(scrapy.Spider):
     def ReceiveInfo(self, response, **kwargs):
         soup = BeautifulSoup(response.text, 'lxml')
         brand = soup.find(attrs={'data-testid' : 'moreProductsItem'}).a.text.strip()
+        exceptions = kwargs.pop('Исключения')
+        if brand.casefold() in exceptions:
+            return 
         title = soup.find('h1', attrs={'data-testid' : 'productTitle'}).text.strip()
         div_contain_sections = soup.find('div', attrs={'data-testid' : 'productSections'})
         formulae = kwargs.pop('Формула')
         margin = kwargs.pop('Маржа')
-        delivery = kwargs.pop('Доставка')
         sale_price = None
-        url = kwargs.pop('Ссылка на категорию товаров')
         for count, section in enumerate(div_contain_sections.find_all('section', recursive=False)):
             match count:
                 case 0:
                     pictures = section.find_all("picture")
                     images = []
-                    for item in [i.source["srcset"] for i in pictures]:
-                        images.append(re.search(r'(.+?webp)', item)[0])
+                    try:
+                        for item in [i.source["srcset"] for i in pictures]:
+                            images.append(re.search(r'(.+?webp)', item)[0])
+                    except:
+                        for item in [i.img["src"] for i in pictures]:
+                            images.append(item)
                     images = ' '.join(images)
                 case 1:
                     ul = section.find('ul')
@@ -145,31 +151,35 @@ class CHILD(scrapy.Spider):
                     else:
                         pass
         return {
+            'Параметр: Поставщик' : "DETI",
+            "Параметр: Доставка" :  kwargs.pop('Доставка'),
             'Свойство: Вариант' : kwargs.pop("Свойство: Вариант") if "Свойство: Вариант" in kwargs.keys() else None,
             "Вес, кг" : str(mass).replace('.', ',') if sale_price is not None else 'Нет массы',
-            "Параметр: Доставка" : delivery,
-            "Ссылка на категорию товаров" : url,
-            'Корневая' : kwargs.pop('root_category'),
-            'Подкатегория 1' : kwargs.pop('add_category'),
-            "Подкатегория 2" : kwargs.pop('add2_category'),
-            'Артикул' : kwargs.pop('prefix') + tmp['Параметр: Код товара'],
-            'Параметр: Тип продукта': None,
-            'Параметр: Поставщик' : "DETI",
-            'Параметр: Group' : None,
+            'Корневая' : kwargs.pop('Корневая'),
+            'Подкатегория 1' : kwargs.pop('Подкатегория 1'),
+            "Подкатегория 2" : kwargs.pop('Подкатегория 2'),
             'Название товара или услуги' : title,
-            'Размещение на сайте' : kwargs.pop('placement'),
             'Полное описание' : description,
-            'Ссылка на товар' : response.url,
+            'Краткое описание' : None,
+            'Параметр: Бренд' : brand,
+            'Размещение на сайте' : kwargs.pop('Расположение на сайте'),
+            'Артикул' : kwargs.pop('Префикс') + tmp['Параметр: Код товара'],
+            "Артикул поставщика" : tmp['Параметр: Код товара'],
             'Цена продажи' : '{:.2f}'.format(sale_price).replace('.', ',') if sale_price is not None else None,
             'Старая цена' : format(float((1 + int(sale_size) / 100) * 1.6 * float(price.replace(',', '.'))), '.2f').replace('.', ',') if price != 'Нет в наличии' and sale_size != None and sale_size else None,
             'Цена закупки' : price.replace('.', ','),
-            'Изображения' : images,
             'Остаток' : 100 if price != 'Нет в наличии' else 0,
-            'Параметр: Бренд' : brand,
-            'Параметр: Производитель' : brand,
-            'Параметр: Артикул поставщика' : article,
+            'Маржа' : margin,
             'Параметр: Размер скидки' : sale_size,
             'Параметр: Метки' : markers,
+            'Параметр: Производитель' : brand,
+            'Параметр: Страна-производитель' : tmp['Параметр: Страна-производитель'] if "Параметр: Страна-производитель" in tmp.keys() else None,
+            'Ссылка на товар' : response.url,
+            "Ссылка на категорию товаров" : kwargs.pop('Ссылка на категорию товаров'),
+            'Изображения' : images,
+            'Параметр: Тип продукта': None,
+            'Параметр: Group' : None,
+            'Параметр: Артикул поставщика' : article,
             **tmp, **kwargs
         }
         
@@ -201,7 +211,6 @@ class CHILD(scrapy.Spider):
             products = soup.find_all('section', id=re.compile(r'product-\d+'))
             for prod in products:
                 if prod.find(string=re.compile(r'Товар закончился|Только в розничных магазинах')):
-                    self.logger.error(f'We have no available products {response.url, products.index(prod)}')
                     return
                 link = prod.find('a')['href']
                 yield scrapy.Request(link, callback=self.handler, cb_kwargs=kwargs)
@@ -210,7 +219,6 @@ class CHILD(scrapy.Spider):
             for prod in products:
                 link = prod.find(href=re.compile(r'.*?www\.detmir\.ru.*'))['href']
                 if prod.find(string=re.compile(r'Товар закончился|Только в розничных магазинах')):
-                    self.logger.error(f'We have no available products {response.url, products.index(prod)}')
                     return
                 yield scrapy.Request(link, callback=self.handler, cb_kwargs=kwargs)
         
@@ -226,9 +234,6 @@ class CHILD(scrapy.Spider):
                 for idx in range(2, max_page + 1):
                     yield scrapy.Request(response.url + '?page={}'.format(idx), callback=self.parse, cb_kwargs=kwargs)
     
-            
-
-
     def closed(self, reason):
         with open('child/child.jsonl', 'r', encoding='utf-8') as file:
             s = file.readlines()
@@ -257,7 +262,7 @@ class CHILD(scrapy.Spider):
             p = pd.DataFrame(r)
             p.to_excel(writer, sheet_name='result_1', index=False)
             table = pd.read_excel('generalTable.xlsx', sheet_name='DETI').to_dict('list')
-            for name, products in df(result, "number"):
+            for name, products in df(result, "Номер"):
                 p = pd.DataFrame(products)
                 table['Кол-во товаров'][name - 1] = len(products)
                 table['Номер книги в файле'][name - 1] = name

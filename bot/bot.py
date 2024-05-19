@@ -1,18 +1,24 @@
 import asyncio
 import logging
-import datetime
+import os
+import time
 
 from aiogram.filters.command import Command
 from aiogram import Bot, Dispatcher
 from aiogram.types import Message, FSInputFile
 from aiogram.methods import SendDocument, SendMessage
 from aiogram import F
-from configs.config import BOT_TOKEN
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 
 logging.basicConfig(level=logging.INFO, filename='bot/log.log', filemode='w')
 
 
-
+dp = Dispatcher()
+bot = Bot(BOT_TOKEN)
 
 def update_xlsx(name):
     import openpyxl
@@ -40,8 +46,6 @@ def update_xlsx(name):
     wb = openpyxl.load_workbook(name)
 
     ws = wb['Загрузка']
-
-
 
     for line in ws.iter_rows(min_row=1):
         article = line[1].value
@@ -71,26 +75,16 @@ def update_xlsx(name):
 
     wb.save(name)
 
-
-        
-
-
-
 def read(path):
     with open (path, 'r') as file:
         return file.read()
 
 
-paths = [
-    'child/ready.txt',
-    'auchan/ready.txt'
-]
-
-dp = Dispatcher()
-bot = Bot(BOT_TOKEN)
-
-def GET_FS_OBJECT(path:str):
-    return FSInputFile(path=path)
+@dp.message(Command('table'))
+async def sendTable(message:Message):
+    path = 'generalTable.xlsx'
+    await message.answer("Дата последней модификации файла: {}".format(time.ctime(os.path.getmtime(path))))
+    await message.answer_document(FSInputFile(path, filename='Общая таблица.xlsx'))
 
 
 @dp.message(F.document.file_name.casefold() == 'общая таблица.xlsx')
@@ -103,63 +97,55 @@ async def updateInputTable(message:Message):
     await message.answer('Операция выполнена успешно. Таблица обновлена!')
 
 
-
 @dp.message(F.content_type.in_({'document'}))
 async def test(msg : Message):
-    
-
     name = msg.document.file_name
     await msg.answer(f'Получили файл {name}')
     await bot.download(msg.document, name)
-
     update_xlsx(name)
-
     await msg.answer('Файл готов, смотрите:)')
-    await msg.answer_document(
-            FSInputFile(name)
-        )
+    await msg.answer_document(FSInputFile(name))
     
-
-
-# @dp.message(Command('letu'))
-# async def letu(message:Message):
-#     status = read(paths[0])
-#     await message.answer(status)
-#     if status == 'Ready': 
-#         await message.answer_document(
-#             FSInputFile('LETU/letu_result.xlsx')
-#         )
-#     else:
-#         await message.answer('Please Wait:)')
 
 @dp.message(Command('child'))
 async def letu(message:Message):
-    status = read(paths[0])
+    status = read('child/ready.txt')
     await message.answer(status)
     if status == 'Ready': 
+        path = 'child/child.xlsx'
+        await message.answer('Дата последнего изменения файла: {}'.format(time.ctime(os.path.getmtime(path))))
         await message.answer_document(
-            FSInputFile('child/child.xlsx', filename='child_{}.xlsx'.format(datetime.datetime.now().day))
+            FSInputFile(path)
         )
     else:
         await message.answer('Please Wait:)')
 
 @dp.message(Command('auchan'))
 async def letu(message:Message):
-    status = read(paths[1])
+    status = read('auchan/ready.txt')
     await message.answer(status)
     if status == 'Ready': 
+        path = "auchan/auchan_result.xlsx"
+        await message.answer('Дата последнего изменения файла: {}'.format(time.ctime(os.path.getmtime(path))))
         await message.answer_document(
-            FSInputFile('auchan/auchan_result.xlsx', filename='auchan_{}.xlsx'.format(datetime.datetime.now().day))
+            FSInputFile(path)
         )
     else:
         await message.answer('Please Wait:)')
 
 
-
-        
-    
-
-
+@dp.message(Command('red'))
+async def letu(message:Message):
+    status = read("red/ready.txt")
+    await message.answer(status)
+    if status == 'Ready': 
+        path = 'red/red.xlsx'
+        await message.answer('Дата последнего изменения файла: {}'.format(time.ctime(os.path.getmtime(path))))
+        await message.answer_document(
+            FSInputFile(path)
+        )
+    else:
+        await message.answer('Please Wait:)')
 
 async def main() -> None:
     await dp.start_polling(bot)

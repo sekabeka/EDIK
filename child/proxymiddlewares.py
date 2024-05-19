@@ -1,23 +1,22 @@
 import requests
+import os
+import random
+import time
 
-from configs.config import API_KEY
+from dotenv import load_dotenv
+
+load_dotenv()
+
+API_KEY = os.getenv('API_KEY')
 
 
 def proxys():
-    import time
-    while True:
-        response = requests.get(f"https://proxy6.net/api/{API_KEY}/getproxy")
-        if response.ok:
-            break
-        else:
-            time.sleep(5)
+    time.sleep(random.randint(3, 6))
+    response = requests.get(f"https://proxy6.net/api/{API_KEY}/getproxy")
     data = response.json()
     result = []
     for item in data['list'].values():
-        if item["type"] == "http":
-            result.append(f'http://{item["user"]}:{item["pass"]}@{item["ip"]}:{item["port"]}')
-        else:
-            print (item)
+        result.append(f'http://{item["user"]}:{item["pass"]}@{item["ip"]}:{item["port"]}')
     yield len(result)
     while True:
         for proxy in result:

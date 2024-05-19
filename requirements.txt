@@ -10,3 +10,4 @@ xlsxwriter
 schedule
 playwright
 fake-useragent
+python-dotenv
