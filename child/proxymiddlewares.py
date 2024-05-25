@@ -16,7 +16,17 @@ def proxys():
     data = response.json()
     result = []
     for item in data['list'].values():
-        result.append(f'http://{item["user"]}:{item["pass"]}@{item["ip"]}:{item["port"]}')
+        proxy = f'http://{item["user"]}:{item["pass"]}@{item["ip"]}:{item["port"]}'
+        response = requests.get(
+            'https://www.detmir.ru',
+            proxies={
+                'http' : proxy,
+                'https' : proxy
+            }
+        )
+        if response.ok:
+            result.append(proxy)
+
     yield len(result)
     while True:
         for proxy in result:
@@ -26,15 +36,17 @@ def proxys():
 class ProxyRegister:
     proxies = proxys()
     length = next(proxies)
+    bad_proxy = set()
     def process_request(self, request, spider):
         if self.length:
-            spider.custom_settings['CONCURRENT_REQUESTS_PER_DOMAIN'] = self.length + 1
-            spider.custom_settings['CONCURRENT_REQUESTS'] = self.length + 2
+            spider.custom_settings['CONCURRENT_REQUESTS_PER_DOMAIN'] = self.length
+            spider.custom_settings['CONCURRENT_REQUESTS'] = self.length
             self.length = None
         request.meta['proxy'] = next(self.proxies)
         return None
 
     def process_response(self, request, response, spider):
         if response.status == 418:
+            print (request.meta['proxy'])
             return request
         return response
