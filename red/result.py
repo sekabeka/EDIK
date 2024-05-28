@@ -309,11 +309,18 @@ class RED(scrapy.Spider):
             p = pd.DataFrame(r)
             p.to_excel(writer, sheet_name='result_1', index=False)
             table = pd.read_excel('generalTable.xlsx', sheet_name='KARM').to_dict('list')
+            value = 0
             for name, products in df(result, "Номер"):
                 p = pd.DataFrame(products)
+                value += len(products)
                 table['Кол-во товаров'][name - 1] = len(products)
                 table['Номер книги в файле'][name - 1] = name
                 p.to_excel(writer, sheet_name=str(name), index=False)
+            for key in table:
+                if key == 'Кол-во товаров':
+                    table[key].append(value)
+                else:
+                    table[key].append(None)
             with pd.ExcelWriter('generalTable.xlsx', mode='a', if_sheet_exists='replace', engine='openpyxl') as w:
                 pd.DataFrame(table).to_excel(w, sheet_name='KARM', index=False)
 
