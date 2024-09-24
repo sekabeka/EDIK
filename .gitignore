@@ -10,5 +10,6 @@ env
 !requirements.txt
 !brands.xlsx
 !generalTable.xlsx
+!input_table.xlsx
 __pycache__
 .DS_Store

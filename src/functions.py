@@ -1,5 +1,6 @@
 import requests
 import os
+import pandas as pd
 
 from dotenv import load_dotenv
 
@@ -30,3 +31,38 @@ def df(lst, key):
 
 def filter(object, key):
     return object.drop_duplicates(subset=[key])
+
+
+def get_input_table_values(name):
+    p = pd.read_excel('src/input_table.xlsx', sheet_name='Лист2')
+    p = p.fillna(0)
+    p = p.to_dict('list')
+    for market, root, sub1, sub2, url, breadcrumbs, formula, special_contidion, special_formula in zip(
+        p.get('Магазин'),
+        p.get('Корневая'),
+        p.get('Подкатегория 1'),
+        p.get('Подкатегория 2'),
+        p.get('Ссылка на категорию товаров'),
+        p.get('Размещение на сайте'),
+        p.get('Формула расчета'),
+        p.get('Особые условия'),
+        p.get('Особые формулы расчета'),
+    ): 
+        if name != market.casefold():
+            continue
+        sub1 = sub1 if sub1 else None
+        sub2 = sub2 if sub2 else None
+        formula = formula.split('=')[-1]
+        constraints = {}
+        if special_contidion and special_formula:
+            for condition, _formula in zip(special_contidion.split(';'), special_formula.split(';')):
+                constraints[condition.casefold()] = _formula.split('=')[-1]
+        yield (
+            root, 
+            sub1,
+            sub2,
+            url,
+            breadcrumbs,
+            formula,
+            constraints
+        )
