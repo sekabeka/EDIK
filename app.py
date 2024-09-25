@@ -42,19 +42,23 @@ def job():
             item['Параметр: Тип'] = None
         pd.DataFrame(result).to_excel(writer, index=False, sheet_name='clear_type')
 
-    send_result_table()
+    send_result_table(871881605)
+    send_result_table(5107226763)
+    
     
 spiders = [
     detmirScraper,
     auchanScraper
 ]
 
-schedule.every().days.at("04:00", "Europe/Moscow").do(job)
+#schedule.every().days.at("04:00", "Europe/Moscow").do(job)
 if __name__ == '__main__':
     try:
         while True:
-            schedule.run_pending()
-            time.sleep(1)
+            #schedule.run_pending()
+            #time.sleep(1)
+            job()
+            break
     except Exception as e:
         print (e)
 

@@ -8,8 +8,8 @@ from scrapy.crawler import Crawler
 from src.functions import get_input_table_values
 
 LOG_FILE_APPEND = False
-CONCURRENT_ITEMS = 500
-CONCURRENT_REQUESTS = 50
+CONCURRENT_ITEMS = 200
+CONCURRENT_REQUESTS = 25
 CONCURRENT_REQUESTS_PER_DOMAIN = None
 
 PATH_TO_LOG_DIRECTORY = 'src/logs'
@@ -291,7 +291,7 @@ class detmirScraper(scrapy.Spider):
             'Старая цена' : None,
             'Цена закупки' : None,
             'Изображения' : None,
-            'Остаток' : None,
+            'Остаток' : 0,
             'Параметр: Бренд' : None,
             'Параметр: Производитель' : None,
             'Параметр: Размер скидки' : None,
@@ -394,13 +394,12 @@ class detmirScraper(scrapy.Spider):
                 formula % {'purchase_price' : product['Цена закупки'], 'mass' : product['Вес, кг']}
             ), 2)
             product['Цена продажи'] = str(sale_price).replace('.', ',')
-            product['Остаток'] = 100
         else:
             product['Цена продажи'] = None
-            product['Остаток'] = 0
         
         if product['Цена закупки'] is not None:
             product['Цена закупки'] = str(round(product['Цена закупки'], 2)).replace('.', ',')
+            product['Остаток'] = 100
         if product['Вес, кг'] is not None:
             product['Вес, кг'] = str(product['Вес, кг']).replace('.', ',')
 

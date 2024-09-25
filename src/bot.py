@@ -58,9 +58,9 @@ async def download_table(message: Message):
 #         await message.answer_document(FSInputFile(path))
 #     await message.answer('Все логи успешно доставлены!')
 
-def send_result_table():
+def send_result_table(id):
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(bot.send_document('5107226763', FSInputFile('src/results/result.xlsx')))
+    loop.run_until_complete(bot.send_document(str(id), FSInputFile('src/results/result.xlsx')))
 
 def run():
     asyncio.run(dp.start_polling(bot))
