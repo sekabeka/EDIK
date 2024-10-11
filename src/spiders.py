@@ -104,7 +104,7 @@ class auchanScraper(scrapy.Spider):
             'Название товара или услуги' : None,
             'Размещение на сайте' : kwargs.pop('breadcrumbs'),
             'Полное описание' : None,
-            'Цена продажи' : None,
+            'Себестоимость' : None,
             'Старая цена' : None,
             'Цена закупки' : None,
             'Изображения' : None,
@@ -124,6 +124,16 @@ class auchanScraper(scrapy.Spider):
         soup = BeautifulSoup(response.text, 'lxml')
         breadcrumbs = ' > '.join([i.text.strip() for i in soup.find_all("li", attrs={"itemprop" : "itemListElement"})[:-1]])
         product['Параметр: Ссылка на категорию товара'] = breadcrumbs
+
+
+        table = soup.find('table', class_='css-9qtgi1')
+        if table is not None:
+            article = table.find('td', class_='css-em38yw')
+            if article is not None:
+                article = re.sub(r'\D', '', article.text)
+                product['Артикул'] = 'BNA' + article
+                product['Параметр: Код товара'] = article
+
         formula = kwargs.pop('formula')
         brand = soup.find('a', class_='css-1awj3d7')
         if brand is not None:
@@ -133,9 +143,18 @@ class auchanScraper(scrapy.Spider):
                 if brand.casefold() in constraints.keys():
                     special_formula = constraints[brand.casefold()]
                     if special_formula.casefold() == 'stop':
-                        print (brand.casefold())
                         return
                     formula = special_formula
+
+                if product['Артикул'].casefold() in constraints.keys():
+                    special_formula = constraints[product['Артикул'].casefold()]
+                    if special_formula.casefold() == 'stop':
+                        return
+                    if '=' in special_formula:
+                        formula = special_formula
+                    else:
+                        product['Себестоимость'] = special_formula
+                        
         formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
         product['Параметр: Бренд'] = brand
         product['Параметр: Производитель'] = brand
@@ -154,7 +173,7 @@ class auchanScraper(scrapy.Spider):
                         2
                     )
                 ).replace('.', ',')
-                product['Цена продажи'] = sale_price
+                product['Себестоимость'] = sale_price
             product['Цена закупки'] = str(round(purchase_price, 2)).replace('.', ',')
 
         count = soup.find('span', class_='inStockData')
@@ -203,13 +222,7 @@ class auchanScraper(scrapy.Spider):
         except Exception as e:
             pass
         product['Изображения'] = ' '.join(images)
-        table = soup.find('table', class_='css-9qtgi1')
-        if table is not  None:
-            article = table.find('td', class_='css-em38yw')
-            if article is not None:
-                article = re.sub(r'\D', '', article.text)
-                product['Артикул'] = 'BNA-' + article
-                product['Параметр: Код товара'] = article
+
 
         title = soup.find('h1', id='productName').text.strip()
         product['Название товара или услуги'] = title
@@ -291,7 +304,7 @@ class detmirScraper(scrapy.Spider):
             'Название товара или услуги' : None,
             'Размещение на сайте' : kwargs.pop('breadcrumbs'),
             'Полное описание' : None,
-            'Цена продажи' : None,
+            'Себестоимость' : None,
             'Старая цена' : None,
             'Цена закупки' : None,
             'Изображения' : None,
@@ -314,6 +327,30 @@ class detmirScraper(scrapy.Spider):
         )
         product['Параметр: Ссылка на категорию товара'] = breadcrumbs
 
+        characteristic = section.find('section', attrs={'data-testid': 'characteristicBlock'})
+        if characteristic:
+            table = characteristic.table
+            for it in table.find_all('tr'):
+                match it.th.text.strip().lower():
+                    case 'артикул':
+                        code = it.td.text.strip()
+                    case 'код товара':
+                        article = it.td.text.strip()
+                        product['Артикул'] = 'BND' + article
+                        product['Параметр: Код товара'] = article
+                    case 'страна производства':
+                        country_manufacturer = it.td.text.strip()
+                        product['Параметр: Страна-производитель'] = country_manufacturer
+                    case 'вес упаковки, кг':
+                        mass = float(it.td.text.strip())
+                        product['Вес, кг'] = mass
+                    case 'тип':
+                        _type = it.td.text.strip()
+                        product['Параметр: Тип'] = _type.capitalize()
+                    case _:
+                        pass
+        else:
+            pass
         brand = soup.find(attrs={'data-testid' : 'moreProductsItem'}).a.text.strip()
         product['Параметр: Бренд'] = brand
         product['Параметр: Производитель'] = brand
@@ -325,6 +362,15 @@ class detmirScraper(scrapy.Spider):
                 if special_formula.casefold() == 'stop':
                     return
                 formula = special_formula
+
+            if product['Артикул'].casefold() in constraints.keys():
+                special_formula = constraints[product['Артикул'].casefold()]
+                if special_formula.casefold() == 'stop':
+                    return
+                if '=' in special_formula:
+                    formula = special_formula
+                else:
+                    product['Cебестоимость'] = special_formula
         formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
         title = soup.find('h1', attrs={'data-testid' : 'pageTitle'}).text.strip()
         product['Название товара или услуги'] = title
@@ -375,37 +421,15 @@ class detmirScraper(scrapy.Spider):
                     else:
                         description = None
                     product['Полное описание'] = description
-                    characteristic = section.find('section', attrs={'data-testid' : 'characteristicBlock'})
-                    if characteristic:
-                        table = characteristic.table
-                        for it in table.find_all('tr'):
-                            match it.th.text.strip().lower():
-                                case 'артикул':
-                                    code = it.td.text.strip()
-                                case 'код товара':
-                                    article = it.td.text.strip()
-                                    product['Артикул'] = 'BND-' + article
-                                    product['Параметр: Код товара'] = article
-                                case 'страна производства':
-                                    country_manufacturer = it.td.text.strip()
-                                    product['Параметр: Страна-производитель'] = country_manufacturer
-                                case 'вес упаковки, кг':
-                                    mass = float(it.td.text.strip())
-                                    product['Вес, кг'] = mass
-                                case 'тип':
-                                    _type = it.td.text.strip()
-                                    product['Параметр: Тип'] = _type.capitalize()
-                                case _ :
-                                    pass
-                    else:
-                        pass
+                   
         if (product['Цена закупки'] and product['Вес, кг']) is not None:
-            sale_price = round(eval(
-                formula % {'purchase_price' : product['Цена закупки'], 'mass' : product['Вес, кг']}
-            ), 2)
-            product['Цена продажи'] = str(sale_price).replace('.', ',')
+            if product['Себестоимость'] is None:
+                sale_price = round(eval(
+                    formula % {'purchase_price' : product['Цена закупки'], 'mass' : product['Вес, кг']}
+                ), 2)
+                product['Себестоимость'] = str(sale_price).replace('.', ',')
         else:
-            product['Цена продажи'] = None
+            product['Себестоимость'] = None
         
         if product['Цена закупки'] is not None:
             product['Цена закупки'] = str(round(product['Цена закупки'], 2)).replace('.', ',')

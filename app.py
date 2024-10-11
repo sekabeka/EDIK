@@ -1,4 +1,5 @@
 import json
+
 import schedule
 import pandas as pd
 import time
@@ -10,6 +11,8 @@ from multiprocessing import Process
 from src.spiders import detmirScraper, auchanScraper
 from src.functions import get_list_proxy
 from src.bot import send_result_table
+from src.google_table import set_table
+
 
 def create_process(spider, proxylist):
     p = CrawlerProcess(Settings())
@@ -50,6 +53,10 @@ def job():
 
     send_result_table(871881605)
     send_result_table(5107226763)
+    set_table(
+        list(result[0].keys()),
+        result
+    )
     
     
 spiders = [
@@ -67,6 +74,7 @@ if __name__ == '__main__':
             #break
     except Exception as e:
         print (e)
+
 
     
     
