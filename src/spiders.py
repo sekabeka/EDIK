@@ -326,54 +326,6 @@ class detmirScraper(scrapy.Spider):
            [i.text.strip() for i in soup.find_all("li", attrs={"data-testid" : "breadcrumbsItem"})[:-1]]
         )
         product['Параметр: Ссылка на категорию товара'] = breadcrumbs
-
-        characteristic = section.find('section', attrs={'data-testid': 'characteristicBlock'})
-        if characteristic:
-            table = characteristic.table
-            for it in table.find_all('tr'):
-                match it.th.text.strip().lower():
-                    case 'артикул':
-                        code = it.td.text.strip()
-                    case 'код товара':
-                        article = it.td.text.strip()
-                        product['Артикул'] = 'BND' + article
-                        product['Параметр: Код товара'] = article
-                    case 'страна производства':
-                        country_manufacturer = it.td.text.strip()
-                        product['Параметр: Страна-производитель'] = country_manufacturer
-                    case 'вес упаковки, кг':
-                        mass = float(it.td.text.strip())
-                        product['Вес, кг'] = mass
-                    case 'тип':
-                        _type = it.td.text.strip()
-                        product['Параметр: Тип'] = _type.capitalize()
-                    case _:
-                        pass
-        else:
-            pass
-        brand = soup.find(attrs={'data-testid' : 'moreProductsItem'}).a.text.strip()
-        product['Параметр: Бренд'] = brand
-        product['Параметр: Производитель'] = brand
-        formula = kwargs.pop('formula')
-        constraints = kwargs.pop('constraints')
-        if constraints:
-            if brand.casefold() in constraints.keys():
-                special_formula = constraints[brand.casefold()]
-                if special_formula.casefold() == 'stop':
-                    return
-                formula = special_formula
-
-            if product['Артикул'].casefold() in constraints.keys():
-                special_formula = constraints[product['Артикул'].casefold()]
-                if special_formula.casefold() == 'stop':
-                    return
-                if '=' in special_formula:
-                    formula = special_formula
-                else:
-                    product['Cебестоимость'] = special_formula
-        formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
-        title = soup.find('h1', attrs={'data-testid' : 'pageTitle'}).text.strip()
-        product['Название товара или услуги'] = title
         div_contain_sections = soup.find('div', attrs={'data-testid' : 'productSections'})
         for count, section in enumerate(div_contain_sections.find_all('section', recursive=False)):
             match count:
@@ -397,31 +349,81 @@ class detmirScraper(scrapy.Spider):
                                 ])
                             except:
                                 promo = None
-                            product['Параметр: Промо'] = promo                            
+                            product['Параметр: Промо'] = promo
                         product['Параметр: Метки'] = markers
                 case 2:
-                    if section.find('p', attrs={'data-testid' : 'price'}):
-                        purchase_price = float(re.sub(r'[^,\.0-9]', '', section.find('p', attrs={'data-testid' : 'price'}).text).replace(',', '.'))
-                        if '%' in section.find('p', attrs={'data-testid' : 'price'}).find_next().text:
-                            sale = int(re.sub('\D', '', section.find('p', attrs={'data-testid' : 'price'}).find_next().text))
+                    if section.find('p', attrs={'data-testid': 'price'}):
+                        purchase_price = float(
+                            re.sub(r'[^,\.0-9]', '', section.find('p', attrs={'data-testid': 'price'}).text).replace(
+                                ',', '.'))
+                        if '%' in section.find('p', attrs={'data-testid': 'price'}).find_next().text:
+                            sale = int(
+                                re.sub('\D', '', section.find('p', attrs={'data-testid': 'price'}).find_next().text))
                             promo = product['Параметр: Промо']
                             if promo is not None:
                                 purchase_price = purchase_price * (1 - promo / 100)
                             old_price = eval(
-                                old_price_pattern % {'sale' : sale, 'purchase_price' : purchase_price}
+                                old_price_pattern % {'sale': sale, 'purchase_price': purchase_price}
                             )
 
                             product['Старая цена'] = str(round(old_price, 2)).replace('.', ',')
                             product['Параметр: Размер скидки'] = sale
                             product['Цена закупки'] = purchase_price
                 case 3:
-                    description = section.find('section', attrs={'data-testid' : 'descriptionBlock'})
+                    description = section.find('section', attrs={'data-testid': 'descriptionBlock'})
                     if description:
                         description = re.sub(r'\xa0', ' ', description.div.text.strip())
                     else:
                         description = None
                     product['Полное описание'] = description
-                   
+                    characteristic = section.find('section', attrs={'data-testid': 'characteristicBlock'})
+                    if characteristic:
+                        table = characteristic.table
+                        for it in table.find_all('tr'):
+                            match it.th.text.strip().lower():
+                                case 'артикул':
+                                    code = it.td.text.strip()
+                                case 'код товара':
+                                    article = it.td.text.strip()
+                                    product['Артикул'] = 'BND' + article
+                                    product['Параметр: Код товара'] = article
+                                case 'страна производства':
+                                    country_manufacturer = it.td.text.strip()
+                                    product['Параметр: Страна-производитель'] = country_manufacturer
+                                case 'вес упаковки, кг':
+                                    mass = float(it.td.text.strip())
+                                    product['Вес, кг'] = mass
+                                case 'тип':
+                                    _type = it.td.text.strip()
+                                    product['Параметр: Тип'] = _type.capitalize()
+                                case _:
+                                    pass
+                    else:
+                        pass
+
+        brand = soup.find(attrs={'data-testid' : 'moreProductsItem'}).a.text.strip()
+        product['Параметр: Бренд'] = brand
+        product['Параметр: Производитель'] = brand
+        formula = kwargs.pop('formula')
+        constraints = kwargs.pop('constraints')
+        if constraints:
+            if brand.casefold() in constraints.keys():
+                special_formula = constraints[brand.casefold()]
+                if special_formula.casefold() == 'stop':
+                    return
+                formula = special_formula
+
+            if product['Артикул'].casefold() in constraints.keys():
+                special_formula = constraints[product['Артикул'].casefold()]
+                if special_formula.casefold() == 'stop':
+                    return
+                if '=' in special_formula:
+                    formula = special_formula
+                else:
+                    product['Cебестоимость'] = special_formula
+        formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
+        title = soup.find('h1', attrs={'data-testid' : 'pageTitle'}).text.strip()
+        product['Название товара или услуги'] = title
         if (product['Цена закупки'] and product['Вес, кг']) is not None:
             if product['Себестоимость'] is None:
                 sale_price = round(eval(
