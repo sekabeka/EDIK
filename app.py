@@ -36,6 +36,12 @@ def job():
         result += [
             json.loads(s) for s in file.readlines()
         ]
+    new = []
+    for item in result:
+        if item['Остаток']:
+            new.append(item)
+
+    result = new
     with pd.ExcelWriter('src/results/result.xlsx', mode='w', engine='xlsxwriter', engine_kwargs={'options' : {'strings_to_urls' : False}}) as writer:
         pd.DataFrame(result).to_excel(writer, index=False, sheet_name='all')
         for item in result:
@@ -51,14 +57,14 @@ spiders = [
     auchanScraper
 ]
 
-#schedule.every().days.at("04:00", "Europe/Moscow").do(job)
+schedule.every().days.at("04:00", "Europe/Moscow").do(job)
 if __name__ == '__main__':
     try:
         while True:
-            #schedule.run_pending()
-            #time.sleep(1)
-            job()
-            break
+            schedule.run_pending()
+            time.sleep(1)
+            #job()
+            #break
     except Exception as e:
         print (e)
 

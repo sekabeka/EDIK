@@ -109,6 +109,7 @@ class auchanScraper(scrapy.Spider):
             'Цена закупки' : None,
             'Изображения' : None,
             'Остаток' : None,
+            'Параметр: Ссылка на категорию товара' : None,
             'Параметр: Бренд' : None,
             'Параметр: Производитель' : None,
             'Параметр: Размер скидки' : None,
@@ -121,6 +122,8 @@ class auchanScraper(scrapy.Spider):
 
         
         soup = BeautifulSoup(response.text, 'lxml')
+        breadcrumbs = ' > '.join([i.text.strip() for i in soup.find_all("li", attrs={"itemprop" : "itemListElement"})[:-1]])
+        product['Параметр: Ссылка на категорию товара'] = breadcrumbs
         formula = kwargs.pop('formula')
         brand = soup.find('a', class_='css-1awj3d7')
         if brand is not None:
@@ -273,7 +276,8 @@ class detmirScraper(scrapy.Spider):
                     'formula' : formula,
                     'constraints' : constraints,
                     'init' : None
-                }
+                },
+                dont_filter=True
             )
 
     def ReceiveInfo(self, response, **kwargs):
@@ -292,6 +296,7 @@ class detmirScraper(scrapy.Spider):
             'Цена закупки' : None,
             'Изображения' : None,
             'Остаток' : 0,
+            'Параметр: Ссылка на категорию товара' : None,
             'Параметр: Бренд' : None,
             'Параметр: Производитель' : None,
             'Параметр: Размер скидки' : None,
@@ -304,6 +309,11 @@ class detmirScraper(scrapy.Spider):
         old_price_pattern = '(1 + %(sale)d / 100) * 1.6 * %(purchase_price)f'
 
         soup = BeautifulSoup(response.text, 'lxml')
+        breadcrumbs = ' > '.join(
+           [i.text.strip() for i in soup.find_all("li", attrs={"data-testid" : "breadcrumbsItem"})[:-1]]
+        )
+        product['Параметр: Ссылка на категорию товара'] = breadcrumbs
+
         brand = soup.find(attrs={'data-testid' : 'moreProductsItem'}).a.text.strip()
         product['Параметр: Бренд'] = brand
         product['Параметр: Производитель'] = brand
