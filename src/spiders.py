@@ -35,7 +35,8 @@ class auchanScraper(scrapy.Spider):
         "CONCURRENT_REQUESTS" : CONCURRENT_REQUESTS
     }
 
-    def __init__(self, proxylist=[]):
+    def __init__(self, proxylist=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.proxylist = proxylist
     
     @classmethod
@@ -63,7 +64,8 @@ class auchanScraper(scrapy.Spider):
                     'constraints' : constraints,
                     'init' : None
                 },
-                callback=self.catalogs
+                callback=self.catalogs,
+                dont_filter=True
             )
 
     def handler(self, response, **kwargs):
@@ -96,7 +98,7 @@ class auchanScraper(scrapy.Spider):
     def parse(self, response, **kwargs):
         product = {
             'Свойство: Вариант' : None,
-            'Вес, кг' : None,
+            'Вес, кг' : '0.1',
             'Корневая' : kwargs.pop('root'),
             'Подкатегория 1' : kwargs.pop('subcategory1'),
             'Подкатегория 2' : kwargs.pop('subcategory2'),
@@ -104,9 +106,9 @@ class auchanScraper(scrapy.Spider):
             'Название товара или услуги' : None,
             'Размещение на сайте' : kwargs.pop('breadcrumbs'),
             'Полное описание' : None,
-            'Себестоимость' : None,
+            'Цена продажи' : None,
             'Старая цена' : None,
-            'Цена закупки' : None,
+            'Себестоимость' : None,
             'Изображения' : None,
             'Остаток' : None,
             'Параметр: Ссылка на категорию товара' : None,
@@ -124,7 +126,6 @@ class auchanScraper(scrapy.Spider):
         soup = BeautifulSoup(response.text, 'lxml')
         breadcrumbs = ' > '.join([i.text.strip() for i in soup.find_all("li", attrs={"itemprop" : "itemListElement"})[:-1]])
         product['Параметр: Ссылка на категорию товара'] = breadcrumbs
-
 
         table = soup.find('table', class_='css-9qtgi1')
         if table is not None:
@@ -153,7 +154,7 @@ class auchanScraper(scrapy.Spider):
                     if '=' in special_formula:
                         formula = special_formula
                     else:
-                        product['Себестоимость'] = special_formula
+                        product['Цена продажи'] = special_formula
                         
         formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
         product['Параметр: Бренд'] = brand
@@ -173,8 +174,9 @@ class auchanScraper(scrapy.Spider):
                         2
                     )
                 ).replace('.', ',')
-                product['Себестоимость'] = sale_price
-            product['Цена закупки'] = str(round(purchase_price, 2)).replace('.', ',')
+                if product['Цена продажи'] is None:
+                    product['Цена продажи'] = sale_price
+            product['Себестоимость'] = str(round(purchase_price, 2)).replace('.', ',')
 
         count = soup.find('span', class_='inStockData')
         if count is not None:
@@ -262,7 +264,8 @@ class detmirScraper(scrapy.Spider):
         "CONCURRENT_REQUESTS" : CONCURRENT_REQUESTS
     }
 
-    def __init__(self, proxylist=[]):
+    def __init__(self, proxylist=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.proxylist = proxylist
     
     @classmethod
@@ -296,7 +299,7 @@ class detmirScraper(scrapy.Spider):
     def ReceiveInfo(self, response, **kwargs):
         product = {
             'Свойство: Вариант' : kwargs.pop('variant', None),
-            'Вес, кг' : None,
+            'Вес, кг' : 0.1,
             'Корневая' : kwargs.pop('root'),
             'Подкатегория 1' : kwargs.pop('subcategory1'),
             'Подкатегория 2' : kwargs.pop('subcategory2'),
@@ -304,9 +307,9 @@ class detmirScraper(scrapy.Spider):
             'Название товара или услуги' : None,
             'Размещение на сайте' : kwargs.pop('breadcrumbs'),
             'Полное описание' : None,
-            'Себестоимость' : None,
+            'Цена продажи' : None,
             'Старая цена' : None,
-            'Цена закупки' : None,
+            'Себестоимость' : None,
             'Изображения' : None,
             'Остаток' : 0,
             'Параметр: Ссылка на категорию товара' : None,
@@ -354,8 +357,8 @@ class detmirScraper(scrapy.Spider):
                 case 2:
                     if section.find('p', attrs={'data-testid': 'price'}):
                         purchase_price = float(
-                            re.sub(r'[^,\.0-9]', '', section.find('p', attrs={'data-testid': 'price'}).text).replace(
-                                ',', '.'))
+                            re.sub(r'[^,\.0-9]', '', section.find('p', attrs={'data-testid': 'price'}).text).replace(',', '.')
+                        )
                         if '%' in section.find('p', attrs={'data-testid': 'price'}).find_next().text:
                             sale = int(
                                 re.sub('\D', '', section.find('p', attrs={'data-testid': 'price'}).find_next().text))
@@ -368,7 +371,7 @@ class detmirScraper(scrapy.Spider):
 
                             product['Старая цена'] = str(round(old_price, 2)).replace('.', ',')
                             product['Параметр: Размер скидки'] = sale
-                            product['Цена закупки'] = purchase_price
+                            product['Себестоимость'] = purchase_price
                 case 3:
                     description = section.find('section', attrs={'data-testid': 'descriptionBlock'})
                     if description:
@@ -420,21 +423,19 @@ class detmirScraper(scrapy.Spider):
                 if '=' in special_formula:
                     formula = special_formula
                 else:
-                    product['Cебестоимость'] = special_formula
+                    product['Цена продажи'] = special_formula
         formula = formula.replace('(маржа)', '').replace(',', '.').replace('р', '').replace('ЦЗ', '%(purchase_price)f').replace('вес', '%(mass)f')
         title = soup.find('h1', attrs={'data-testid' : 'pageTitle'}).text.strip()
         product['Название товара или услуги'] = title
-        if (product['Цена закупки'] and product['Вес, кг']) is not None:
-            if product['Себестоимость'] is None:
+        if (product['Себестоимость'] and product['Вес, кг']) is not None:
+            if product['Цена продажи'] is None:
                 sale_price = round(eval(
-                    formula % {'purchase_price' : product['Цена закупки'], 'mass' : product['Вес, кг']}
+                    formula % {'purchase_price' : product['Себестоимость'], 'mass' : product['Вес, кг']}
                 ), 2)
-                product['Себестоимость'] = str(sale_price).replace('.', ',')
-        else:
-            product['Себестоимость'] = None
+                product['Цена продажи'] = str(sale_price).replace('.', ',')
         
-        if product['Цена закупки'] is not None:
-            product['Цена закупки'] = str(round(product['Цена закупки'], 2)).replace('.', ',')
+        if product['Себестоимость'] is not None:
+            product['Себестоимость'] = str(round(product['Себестоимость'], 2)).replace('.', ',')
             product['Остаток'] = 100
         if product['Вес, кг'] is not None:
             product['Вес, кг'] = str(product['Вес, кг']).replace('.', ',')
