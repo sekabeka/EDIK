@@ -45,6 +45,7 @@ def job():
             new.append(item)
 
     result = new
+    google_table = result
     with pd.ExcelWriter('src/results/result.xlsx', mode='w', engine='xlsxwriter', engine_kwargs={'options' : {'strings_to_urls' : False}}) as writer:
         pd.DataFrame(result).to_excel(writer, index=False, sheet_name='all')
         for item in result:
@@ -53,10 +54,6 @@ def job():
 
     send_result_table(871881605)
     send_result_table(5107226763)
-    set_table(
-        list(result[0].keys()),
-        result
-    )
     
     
 spiders = [
