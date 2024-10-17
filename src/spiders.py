@@ -166,16 +166,17 @@ class auchanScraper(scrapy.Spider):
             if soup.find(string=pattern) is not None:
                 mass = float(soup.find(string=pattern).find_next().text)
                 product['Вес, кг'] = str(mass).replace('.', ',')
-                sale_price = str(
+
+            mass = float(product['Вес, кг'].replace(',', '.'))
+            if product['Цена продажи'] is None:
+                product['Цена продажи'] = str(
                     round(
                         eval(
-                            formula % {'purchase_price' : purchase_price, 'mass' : mass}
+                            formula % {'purchase_price': purchase_price, 'mass': mass}
                         ),
                         2
                     )
                 ).replace('.', ',')
-                if product['Цена продажи'] is None:
-                    product['Цена продажи'] = sale_price
             product['Себестоимость'] = str(round(purchase_price, 2)).replace('.', ',')
 
         count = soup.find('span', class_='inStockData')
